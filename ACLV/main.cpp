@@ -5,20 +5,56 @@
 #include <allegro5\allegro_primitives.h>
 #include <allegro5/allegro_audio.h>
 #include <allegro5/allegro_acodec.h>
+#include <allegro5/allegro_ttf.h>
 #include "Item.h"
 #include "Pilha.h"
+#include <vector>
+#include <algorithm>  
+#include <ctime>        // std::time
 
+using std::vector;
 
 #define DISPLAY_W 960
 #define DISPLAY_H 540
 #define FPS 60
 #define NUM_TIPOS 7
+#define PONTOS_PILHA_CERTA 100
+#define Y_ITEM_INICIAL 30
+#define Y_ITEM_FINAL 390
+#define Y_DELTA_ITEM 54
+#define X_ITEM_0 300
+#define X_DELTA_ITEM 170
+#define X_PRIMEIRO_COPO 260
+#define X_DELTA_COPO 170
+#define Y_COPO 220
+#define Y_BOTAO_INICIAL 480
+#define Y_BOTAO_FINAL 510
+#define X_PRIMEIRO_BOTAO 290
+#define X_TAMANHO_BOTAO 70
+#define Y_COLISAO 170
+#define Y_VEL_QUEDA_COPO 1.1
 
-/*Função geradora do novo item*/
-Item gera_item(ALLEGRO_BITMAP* bitmap[NUM_TIPOS], int x, int y)
+bool defineTiros(int& tiro, vector<int>& tipo_tiro, Pilha<Item> pilha[], Pilha<int> gabarito[])
 {
-	int random = rand() % (NUM_TIPOS);
-	return Item(random, bitmap[random], x, y);
+	if (tiro < 0)
+	{
+		tipo_tiro.erase(tipo_tiro.begin(), tipo_tiro.end());
+		printf("Criando fila de lançamento: \n");
+		int i;
+		for (i = 0; i < 4; i++)
+		{
+			int quant = pilha[i].get_quant_itens();
+			int ritem = gabarito[i].get_item(quant);
+			printf("Pilha: %d Andar da pilha: %d Item: %d\n", i, quant, ritem);
+			tipo_tiro.push_back(ritem);
+		}
+		std::random_shuffle(tipo_tiro.begin(), tipo_tiro.end());
+		tiro = 3;
+		return true;
+	}
+	else {
+		return false;
+	}
 }
 
 int main()
@@ -29,18 +65,20 @@ int main()
 	ALLEGRO_BITMAP  *sel = NULL;
 	ALLEGRO_BITMAP  *sel_down = NULL;
 	ALLEGRO_BITMAP  *bebida[7] = { NULL };
+	ALLEGRO_BITMAP  *tb_bebida[7] = { NULL };
 	ALLEGRO_EVENT_QUEUE *event_queue = NULL;
 	ALLEGRO_EVENT_QUEUE *display_queue = NULL;
 	ALLEGRO_TIMER *timer = NULL;
 	ALLEGRO_MOUSE_STATE state;
 	ALLEGRO_SAMPLE *jump;
-	
-	//posicao do novo item
-	int x_item = 300;
-	int y_item = 50;
 
+
+	std::srand(unsigned(std::time(0)));
 	bool done = false;
-	bool g_novo = true;
+	bool item_novo = true;
+	int tiro = -1;
+	vector<int> tipo_tiro;
+	tipo_tiro.reserve(4);
 	Pilha<Item> pilha[4];
 	Pilha<Item> p_novo;
 	Pilha<int> gabarito[4];
@@ -49,6 +87,17 @@ int main()
 	int p_selecionada = 0;
 	int l_pilha = -1;
 	bool gab_stat[4] = { false };
+	bool KeyDown = false;
+	int Pontos = 0;
+	int i, j;
+
+	//geração da posicao dos botoes
+	int X_BOTAO[4][2];
+	for (i = 0; i < 4; i++)
+		for (j = 0; j < 2;j++)
+		{
+			X_BOTAO[i][j] = X_PRIMEIRO_BOTAO + i*X_DELTA_COPO + j*X_TAMANHO_BOTAO;
+		}
 
 	/*Inicializações*/
 	if (!al_init()) {
@@ -77,6 +126,9 @@ int main()
 
 	al_init_primitives_addon();
 
+	al_init_ttf_addon();// initialize the ttf (True Type Font) addon
+
+
 	if (!al_install_audio()) {
 		fprintf(stderr, "failed to initialize audio!\n");
 		return -1;
@@ -91,7 +143,16 @@ int main()
 		fprintf(stderr, "failed to reserve samples!\n");
 		return -1;
 	}
-	ALLEGRO_FONT* font = al_create_builtin_font();
+	ALLEGRO_FONT *font = al_load_ttf_font("KOMIKAX_.ttf", 16, 0);
+	if (!font) {
+		fprintf(stderr, "Could not load 'KOMIKAX_.ttf'.\n");
+		return -1;
+	}
+	if (!al_install_keyboard()) {
+		fprintf(stderr, "failed to initialize the keyboard!\n");
+		return -1;
+	}
+
 
 	/*Load de bitmaps*/
 	bg = al_load_bitmap("bg.jpg");
@@ -103,6 +164,13 @@ int main()
 	bebida[4] = al_load_bitmap("frutas/uva.png");
 	bebida[5] = al_load_bitmap("frutas/melancia.png");
 	bebida[6] = al_load_bitmap("frutas/morango.png");
+	tb_bebida[0] = al_load_bitmap("frutas/tb-limao.png");
+	tb_bebida[1] = al_load_bitmap("frutas/tb-tangerina.png");
+	tb_bebida[2] = al_load_bitmap("frutas/tb-cereja.png");
+	tb_bebida[3] = al_load_bitmap("frutas/tb-maca.png");
+	tb_bebida[4] = al_load_bitmap("frutas/tb-uva.png");
+	tb_bebida[5] = al_load_bitmap("frutas/tb-melancia.png");
+	tb_bebida[6] = al_load_bitmap("frutas/tb-morango.png");
 	sel = al_load_bitmap("sel.jpg");
 	sel_down = al_load_bitmap("sel_down.jpg");
 	if (!copo||!bg||!bebida[0] || !bebida[1] || !bebida[2] || !bebida[3] || !bebida[4] || !bebida[5] || !bebida[6]) {
@@ -124,7 +192,8 @@ int main()
 	al_register_event_source(event_queue, al_get_timer_event_source(timer));
 	al_start_timer(timer);
 
-
+	al_register_event_source(event_queue, al_get_keyboard_event_source());
+	al_register_event_source(event_queue, al_get_display_event_source(display));
 
 	while (!done)
 	{
@@ -147,82 +216,107 @@ int main()
 			}
 		}
 
+		//Keyboard
+		if (ev.type == ALLEGRO_EVENT_KEY_DOWN && KeyDown == false)///look for keyboard events
+		{
+			KeyDown = true;
+			if (ev.keyboard.keycode == ALLEGRO_KEY_RIGHT && p_selecionada <3)
+			{
+				++p_selecionada;
+
+			}else if (ev.keyboard.keycode == ALLEGRO_KEY_LEFT && p_selecionada>0)
+			{
+				--p_selecionada;
+			}
+		}else if(ev.type == ALLEGRO_EVENT_KEY_UP)
+		{
+			KeyDown = false;
+		}
+
+
 		//mouse
 		al_get_mouse_state(&state);
 		if (state.buttons & 1) {
-			if (state.y > 480 && state.y < 510)
+			if (state.y > Y_BOTAO_INICIAL && state.y < Y_BOTAO_FINAL)
 			{
-				if (state.x > 290 && state.x < 360)
+				if (state.x > X_BOTAO[0][0] && state.x < X_BOTAO[0][1])
 				{
 					p_selecionada = 0;
-					x_item = 300;
 				}
-				else if (state.x > 460 && state.x < 530)
+				else if (state.x > X_BOTAO[1][0] && state.x < X_BOTAO[1][1])
 				{
 					p_selecionada = 1;
-					x_item = 470;
 				}
-				else if (state.x > 630 && state.x < 700)
+				else if (state.x > X_BOTAO[2][0] && state.x < X_BOTAO[2][1])
 				{
 					p_selecionada = 2;
-					x_item = 640;
 				}
-				else if (state.x > 800 && state.x < 870)
+				else if (state.x > X_BOTAO[3][0] && state.x < X_BOTAO[3][1])
 				{
 					p_selecionada = 3;
-					x_item = 810;
 				}
 			}
 		}
-		
+	
+
 		//criação do novo item
-		if (g_novo)
+		if (item_novo)
 		{
-			g_novo = false;
-			novo = gera_item(bebida, x_item, y_item);
+			defineTiros(tiro, tipo_tiro, pilha, gabarito);
+			item_novo = false;
+			int tipo = tipo_tiro.at(tiro--);
+			novo = Item(tipo, bebida[tipo], X_ITEM_0 + p_selecionada * X_DELTA_ITEM, Y_ITEM_INICIAL);
 			printf("Novo item gerado: tipo %d\n", novo.get_tipo());
 			al_play_sample(jump, 1.0, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
 		}
+
 		int gy = novo.get_y();
-		if (gy <= 170)
+		if (gy < Y_COLISAO)
 		{
 			al_draw_bitmap(novo.get_bitmap(), novo.get_x(), gy, 0);
-			novo.set_pos(x_item, gy + 1);
-			if (gy == 170)
-			{
-				l_pilha = p_selecionada;
-				anterior = novo;
-				g_novo = true;
-				printf("Pilha escolhida: %d\n", l_pilha);
-			}
+			novo.set_pos(X_ITEM_0 + p_selecionada * X_DELTA_ITEM, gy + 1);
+			
+		}else if (gy == Y_COLISAO)
+		{
+			l_pilha = p_selecionada;
+			anterior = novo;
+			item_novo = true;
+			printf("Pilha escolhida: %d\n", l_pilha);
 		}
 		
 		//inserção do item na pilha apos colisao
 		if (l_pilha != -1)
 		{
 			int ay = anterior.get_y();
-			int yfinal = 390 - pilha[l_pilha].get_quant_itens() * 54;
-			if ((pilha[l_pilha].cheia() == false) && ay != yfinal)
+			int yfinal = Y_ITEM_FINAL - pilha[l_pilha].get_quant_itens() * Y_DELTA_ITEM;
+			
+			if ((pilha[l_pilha].cheia() == false) && ay == 170)
 			{
-				if (ay >= yfinal)
-				{
-					anterior.set_pos(anterior.get_x(), yfinal);
-					pilha[l_pilha].coloca(anterior);
-					printf("Item adicionado a Pilha %d\n", l_pilha);
-					l_pilha = -1;
-				}
-				else
-				{
-					al_draw_bitmap(anterior.get_bitmap(), anterior.get_x(), ay, 0);
-					anterior.set_pos(x_item, ay*1.1);
-					
-				}
-
+				anterior.set_pos(X_ITEM_0 + l_pilha * X_DELTA_ITEM, yfinal);
+				pilha[l_pilha].coloca(anterior);
+				printf("Item adicionado a Pilha %d\n", l_pilha);
+				anterior.set_pos(X_ITEM_0 + l_pilha * X_DELTA_ITEM, ay+1);
+				al_draw_bitmap(anterior.get_bitmap(), anterior.get_x(), ay, 0);
 			}
 			else if (pilha[l_pilha].cheia() == true)
 			{
 				printf("Pilha %d cheia\n", l_pilha);
 				l_pilha = -1;
+			}
+			else
+			{
+				if (ay >= yfinal)
+				{
+					anterior.set_pos(X_ITEM_0 + l_pilha * X_DELTA_ITEM, yfinal);
+					l_pilha = -1;
+				}
+				else
+				{
+					al_draw_bitmap(anterior.get_bitmap(), anterior.get_x(), ay, 0);
+					
+					anterior.set_pos(X_ITEM_0 + l_pilha * X_DELTA_ITEM, ay*Y_VEL_QUEDA_COPO);
+				}
+
 			}
 		}
 		
@@ -230,7 +324,10 @@ int main()
 		for (i = 0; i<4; i++)
 		{
 			int t = 0;
-			while (t<pilha[i].get_quant_itens())
+			int quant = pilha[i].get_quant_itens();
+			if (l_pilha == i)
+				quant--;
+			while (t<quant)
 			{
 				Item temp = pilha[i].get_item(t);
 				al_draw_bitmap(temp.get_bitmap(), temp.get_x(), temp.get_y(), 0);
@@ -244,46 +341,79 @@ int main()
 			for (j = 3; j >= 0;j--)
 			{
 				int tipo = gabarito[i].get_item(j);
-				al_draw_bitmap(bebida[tipo], 20+52*i, 470-52*j, 0);
+				al_draw_bitmap(tb_bebida[tipo], 240+170*i, 430-30*j, 0);
 			}
 		}
 		
 		//draw dos copos
-		al_draw_bitmap(copo, 770, 220, 0);
-		al_draw_bitmap(copo, 600, 220, 0);
-		al_draw_bitmap(copo, 430, 220, 0);
-		al_draw_bitmap(copo, 260, 220, 0);
+		al_draw_bitmap(copo, X_PRIMEIRO_COPO + 3*X_DELTA_COPO, Y_COPO, 0);
+		al_draw_bitmap(copo, X_PRIMEIRO_COPO + 2*X_DELTA_COPO, Y_COPO, 0);
+		al_draw_bitmap(copo, X_PRIMEIRO_COPO + X_DELTA_COPO, Y_COPO, 0);
+		al_draw_bitmap(copo, X_PRIMEIRO_COPO, Y_COPO, 0);
 		
 		//Draw dos botoes
-		al_draw_bitmap(sel, 290, 480, 0);
-		al_draw_bitmap(sel, 460, 480, 0);
-		al_draw_bitmap(sel, 630, 480, 0);
-		al_draw_bitmap(sel, 800, 480, 0);
-		switch (p_selecionada)
+		al_draw_bitmap(sel, X_BOTAO[0][0], Y_BOTAO_INICIAL, 0);
+		al_draw_bitmap(sel, X_BOTAO[1][0], Y_BOTAO_INICIAL, 0);
+		al_draw_bitmap(sel, X_BOTAO[2][0], Y_BOTAO_INICIAL, 0);
+		al_draw_bitmap(sel, X_BOTAO[3][0], Y_BOTAO_INICIAL, 0);
+		al_draw_bitmap(sel_down, X_BOTAO[p_selecionada][0], 480, 0);
+
+
+		//Detecção se a pilha ta cheia
+		for (i = 0; i < 4; i++)
 		{
-		case 0:
-			al_draw_bitmap(sel_down, 290, 480, 0);
-			break;
-		case 1:
-			al_draw_bitmap(sel_down, 460, 480, 0);
-			break;
-		case 2:
-			al_draw_bitmap(sel_down, 630, 480, 0);
-			break;
-		case 3:
-			al_draw_bitmap(sel_down, 800, 480, 0);
-			break;
+			if (pilha[i].cheia())
+			{
+				bool igual = true;
+				for (j = 0; j < 4; j++)
+				{
+					if (pilha[i].retira().get_tipo() != gabarito[i].retira())
+					{
+						igual = false;
+					}
+				}
+				if (igual)
+				{
+					Pontos += PONTOS_PILHA_CERTA;
+					printf("Pilha igual. %d pontos add\n", PONTOS_PILHA_CERTA);
+				}
+				else
+				{
+					printf("Pilha diferente\n");
+				}
+				gab_stat[i] = false;
+			}
 		}
+
+		//HUD
+		char num[5];
+		_itoa_s(Pontos, num, 10);
+		al_draw_text(font, al_map_rgb(255,255,255), 50, 475, ALLEGRO_ALIGN_LEFT, "Placar: ");
+		al_draw_text(font, al_map_rgb(255, 255, 255), 130, 475, ALLEGRO_ALIGN_LEFT, num);
+
+		if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
+		{
+			done = true;
+		}
+		
+		//Travar o jogo
+		while (ev.type == ALLEGRO_EVENT_KEY_DOWN&&ev.keyboard.keycode == ALLEGRO_KEY_DOWN)///look for keyboard events
+		{
+		}
+				
 
 		//novo frame
 		al_flip_display();
 		al_clear_to_color(al_map_rgb(0, 0, 0));
+
 	}
 
 	al_destroy_event_queue(event_queue);
 	al_destroy_timer(timer);
 	al_destroy_display(display);
 	al_destroy_sample(jump);
+
+
 
 	return 0;
 }
