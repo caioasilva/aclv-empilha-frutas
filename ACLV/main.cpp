@@ -27,9 +27,9 @@ using std::vector;
 #define X_PRIMEIRO_COPO 260
 #define X_DELTA_COPO 170
 #define Y_COPO 220
-#define Y_BOTAO_INICIAL 480
-#define Y_BOTAO_FINAL 510
-#define X_PRIMEIRO_BOTAO 290
+#define Y_BOTAO_INICIAL 475
+#define Y_BOTAO_FINAL 505
+#define X_PRIMEIRO_BOTAO 292
 #define X_TAMANHO_BOTAO 70
 #define Y_COLISAO 170
 #define Y_VEL_QUEDA_COPO 1.1
@@ -356,7 +356,7 @@ int main()
 		al_draw_bitmap(sel, X_BOTAO[1][0], Y_BOTAO_INICIAL, 0);
 		al_draw_bitmap(sel, X_BOTAO[2][0], Y_BOTAO_INICIAL, 0);
 		al_draw_bitmap(sel, X_BOTAO[3][0], Y_BOTAO_INICIAL, 0);
-		al_draw_bitmap(sel_down, X_BOTAO[p_selecionada][0], 480, 0);
+		al_draw_bitmap(sel_down, X_BOTAO[p_selecionada][0], Y_BOTAO_INICIAL, 0);
 
 
 		//Detecção se a pilha ta cheia
@@ -395,12 +395,6 @@ int main()
 		{
 			done = true;
 		}
-		
-		//Travar o jogo
-		while (ev.type == ALLEGRO_EVENT_KEY_DOWN&&ev.keyboard.keycode == ALLEGRO_KEY_DOWN)///look for keyboard events
-		{
-		}
-				
 
 		//novo frame
 		al_flip_display();
