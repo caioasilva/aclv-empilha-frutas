@@ -48,6 +48,7 @@ using std::string;
 //variaveis globais
 ALLEGRO_DISPLAY *display = NULL;
 ALLEGRO_BITMAP  *bg = NULL;
+ALLEGRO_BITMAP  *gameover = NULL;
 ALLEGRO_BITMAP  *copo = NULL;
 ALLEGRO_BITMAP  *sel = NULL;
 ALLEGRO_BITMAP  *sel_down = NULL;
@@ -63,6 +64,8 @@ ALLEGRO_SAMPLE *jump;
 ALLEGRO_SAMPLE *ring;
 ALLEGRO_SAMPLE *musicgame;
 ALLEGRO_FONT *font;
+ALLEGRO_FONT *pontos_gameover;
+
 
 int i, j; // sei la pq isso ta aqui
 
@@ -73,13 +76,13 @@ int defineTiro(Pilha<Item> pilha[], Pilha<int> gabarito[])
 {
 	vector<int> tipo_tiro;
 	tipo_tiro.reserve(4);
-		printf("Criando lançamentos: \n");
+		//printf("Criando lançamentos: \n");
 		int i;
 		for (i = 0; i < 4; i++)
 		{
 			int quant = pilha[i].get_quant_itens();
 			int ritem = gabarito[i].get_item(quant);
-			printf("Pilha: %d Andar da pilha: %d Item: %d\n", i, quant, ritem);
+			//printf("Pilha: %d Andar da pilha: %d Item: %d\n", i, quant, ritem);
 			tipo_tiro.push_back(ritem);
 		}
 		std::random_shuffle(tipo_tiro.begin(), tipo_tiro.end());
@@ -90,7 +93,7 @@ int defineTiro(Pilha<Item> pilha[], Pilha<int> gabarito[])
 bool iniciaJogo()
 {
 	Pilha<Item> pilha[4];
-	int Pontos = 0; 
+	int Pontos = 0;
 	bool item_novo = true;
 	int tiro = -1;
 	vector<int> tipo_tiro;
@@ -101,9 +104,9 @@ bool iniciaJogo()
 	bool KeyDown = false;
 	bool gab_stat[4] = { false };
 	int pontuou[3] = { -1 };
-	int vidas = 8;
+	int vidas = 6;
 	float aceleracao = 0.5;
-	float vel_queda = 1.0;
+	int vel_queda = 1;
 	Item novo;
 	Item anterior;
 
@@ -112,7 +115,7 @@ bool iniciaJogo()
 
 	al_attach_sample_instance_to_mixer(songInstance, al_get_default_mixer());
 	al_play_sample_instance(songInstance);
-	while (vidas>0)
+	while (vidas > 0)
 	{
 		ALLEGRO_EVENT ev;
 		al_wait_for_event(event_queue, &ev);
@@ -124,7 +127,7 @@ bool iniciaJogo()
 		if (ev.type == ALLEGRO_EVENT_KEY_DOWN && KeyDown == false)///look for keyboard events
 		{
 			KeyDown = true;
-			if (ev.keyboard.keycode == ALLEGRO_KEY_RIGHT && p_selecionada <3)
+			if (ev.keyboard.keycode == ALLEGRO_KEY_RIGHT && p_selecionada < 3)
 			{
 				++p_selecionada;
 
@@ -165,8 +168,9 @@ bool iniciaJogo()
 			int tipo = defineTiro(pilha, gabarito);
 			item_novo = false;
 			novo = Item(tipo, bebida[tipo], X_ITEM_0 + p_selecionada * X_DELTA_ITEM, Y_ITEM_INICIAL);
-			printf("Novo item gerado: tipo %d\n", novo.get_tipo());
+			//printf("Novo item gerado: tipo %d\n", novo.get_tipo());
 			al_play_sample(jump, 1.0, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+			aceleracao += 0.1;
 		}
 
 
@@ -177,14 +181,17 @@ bool iniciaJogo()
 		if (gy < Y_COLISAO)
 		{
 			al_draw_bitmap(novo.get_bitmap(), novo.get_x(), gy, 0);
-			float mais = vel_queda;
-			if (gy % 2 == 0 && gy % 3 == 0)
-				mais += aceleracao;
-			else if (aceleracao>3)
+			int mais = vel_queda;
+			int numero = 6-aceleracao;
+			if (numero == 0)
 			{
 				vel_queda++;
 				aceleracao = 0;
+				mais = vel_queda;
 			}
+			else if ((gy/vel_queda) % numero == 0)
+				mais++;
+			//printf("%d", mais);
 			novo.set_pos(X_ITEM_0 + p_selecionada * X_DELTA_ITEM, gy + mais);
 		}
 		else if (gy >= Y_COLISAO)
@@ -192,18 +199,18 @@ bool iniciaJogo()
 			l_pilha = p_selecionada;
 			anterior = novo;
 			item_novo = true;
-			printf("Pilha escolhida: %d\n", l_pilha);
+			//printf("Pilha escolhida: %d\n", l_pilha);
 			if (!(pilha[l_pilha].cheia()))
 			{
 				int yfinal = Y_ITEM_FINAL - pilha[l_pilha].get_quant_itens() * Y_DELTA_ITEM;
 				novo.set_pos(X_ITEM_0 + p_selecionada * X_DELTA_ITEM, yfinal);
 				pilha[l_pilha].coloca(novo);
-				printf("Item adicionado a Pilha %d\n", l_pilha);
+				//printf("Item adicionado a Pilha %d\n", l_pilha);
 				//anterior.set_pos(X_ITEM_0 + p_selecionada * X_DELTA_ITEM, gy );
 			}
 			else
 			{
-				printf("Pilha %d cheia\n", l_pilha);
+				//printf("Pilha %d cheia\n", l_pilha);
 				l_pilha = -1;
 			}
 		}
@@ -228,14 +235,14 @@ bool iniciaJogo()
 		}
 
 		//Loop pilhas
-		for (i = 0; i<4; i++)
+		for (i = 0; i < 4; i++)
 		{
 			//Draw
 			int t = 0;
 			int quant = pilha[i].get_quant_itens();
 			if (l_pilha == i)
 				quant--;
-			while (t<quant)
+			while (t < quant)
 			{
 				Item temp = pilha[i].get_item(t);
 				al_draw_bitmap(temp.get_bitmap(), temp.get_x(), temp.get_y(), 0);
@@ -264,46 +271,40 @@ bool iniciaJogo()
 				{
 				case 4:
 					Pontos += PONTOS_PILHA_CERTA;
-					printf("Pilha igual. %d pontos add\n", PONTOS_PILHA_CERTA);
+					//printf("Pilha igual. %d pontos add\n", PONTOS_PILHA_CERTA);
 					pontuou[0] = 0;
 					pontuou[1] = i;
 					pontuou[2] = 3;
-					if(vidas<10)
+					if (vidas < 10)
 						vidas++;
-					if (aceleracao < 3)
-						aceleracao += 0.5;
-					else
-						aceleracao += 0.25;
+						aceleracao += 0.1;
 					break;
 				case 3:
 					Pontos += PONTOS_PILHA_CERTA * 3 / 4;
-					printf("3 certos. %d pontos add\n", PONTOS_PILHA_CERTA * 3 / 4);
+					//printf("3 certos. %d pontos add\n", PONTOS_PILHA_CERTA * 3 / 4);
 					pontuou[0] = 0;
 					pontuou[1] = i;
 					pontuou[2] = 2;
 					vidas -= 1;
-					if (aceleracao<5)
-						aceleracao += 0.25;
+					aceleracao += 0.05;
 					break;
 				case 2:
 					Pontos += PONTOS_PILHA_CERTA / 2;
-					printf("2 certos. %d pontos add\n", PONTOS_PILHA_CERTA / 2);
+					//printf("2 certos. %d pontos add\n", PONTOS_PILHA_CERTA / 2);
 					pontuou[0] = 0;
 					pontuou[1] = i;
 					pontuou[2] = 1;
 					vidas -= 2;
-	
-						aceleracao += 0.125;
+					aceleracao += 0.05;
 					break;
 				case 1:
 					Pontos += PONTOS_PILHA_CERTA * 1 / 4;
-					printf("1 certos. %d pontos add\n", PONTOS_PILHA_CERTA * 1 / 4);
+					//printf("1 certos. %d pontos add\n", PONTOS_PILHA_CERTA * 1 / 4);
 					pontuou[0] = 0;
 					pontuou[1] = i;
 					pontuou[2] = 0;
 					vidas -= 3;
-
-						aceleracao += 0.0625;
+					aceleracao += 0.05;
 					break;
 				default:
 					vidas -= 4;
@@ -335,9 +336,9 @@ bool iniciaJogo()
 		char num[5];
 		_itoa_s(Pontos, num, 10);
 		al_draw_text(font, al_map_rgb(255, 255, 255), X_PLACAR, Y_PLACAR, ALLEGRO_ALIGN_LEFT, "Placar: ");
-		al_draw_text(font, al_map_rgb(255, 255, 255), X_PLACAR+130, Y_PLACAR, ALLEGRO_ALIGN_LEFT, num);
-		al_draw_text(font, al_map_rgb(255, 255, 255), X_PRIMEIRA_VIDA-110, Y_PLACAR, ALLEGRO_ALIGN_LEFT, "Vidas:");
-		for (i = 0; i <vidas; i++)
+		al_draw_text(font, al_map_rgb(255, 255, 255), X_PLACAR + 130, Y_PLACAR, ALLEGRO_ALIGN_LEFT, num);
+		al_draw_text(font, al_map_rgb(255, 255, 255), X_PRIMEIRA_VIDA - 110, Y_PLACAR, ALLEGRO_ALIGN_LEFT, "Vidas:");
+		for (i = 0; i < vidas; i++)
 		{
 			al_draw_bitmap(vida, X_PRIMEIRA_VIDA + i* X_DELTA_VIDA, Y_PRIMEIRA_VIDA, 0);
 		}
@@ -353,6 +354,26 @@ bool iniciaJogo()
 
 	}
 	al_destroy_sample_instance(songInstance);
+
+	bool botao = false;
+	
+	while(!botao){
+		ALLEGRO_EVENT ev;
+		al_wait_for_event(event_queue, &ev);
+		al_draw_bitmap(gameover, 0, 0, 0);
+		char num[5];
+		_itoa_s(Pontos, num, 10);
+		al_draw_text(pontos_gameover, al_map_rgb(16, 16, 16), 612, 295, ALLEGRO_ALIGN_CENTER, num);
+		al_get_mouse_state(&state);
+		if (state.buttons & 1)
+			if ((state.y > 395 && state.y < 455) && (state.x > 537 && state.x < 684))
+				botao = true;
+
+		if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
+			return false;
+		al_flip_display();
+		al_clear_to_color(al_map_rgb(0, 0, 0));
+	} 
 	return true;
 }
 
@@ -406,6 +427,7 @@ int main()
 		return -1;
 	}
 	font = al_load_ttf_font("KOMIKAX_.ttf", 28, 0);
+	pontos_gameover = al_load_ttf_font("KOMIKAX_.ttf", 58, 0);
 	if (!font) {
 		fprintf(stderr, "Could not load 'KOMIKAX_.ttf'.\n");
 		return -1;
@@ -419,6 +441,7 @@ int main()
 
 	/*Load de bitmaps*/
 	bg = al_load_bitmap("bitmaps/bg.jpg");
+	gameover = al_load_bitmap("bitmaps/gameover.jpg");
 	copo = al_load_bitmap("bitmaps/copo.png");
 	bebida[0] = al_load_bitmap("frutas/limao.png");
 	bebida[1] = al_load_bitmap("frutas/tangerina.png");
