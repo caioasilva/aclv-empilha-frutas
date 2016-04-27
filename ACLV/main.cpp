@@ -7,6 +7,7 @@
 #include <allegro5/allegro_acodec.h>
 #include <allegro5/allegro_ttf.h>
 #include <allegro5/allegro_color.h>
+#include <allegro5/allegro_acodec.h>
 #include "Item.h"
 #include "Pilha.h"
 #include <vector>
@@ -60,6 +61,7 @@ ALLEGRO_TIMER *timer = NULL;
 ALLEGRO_MOUSE_STATE state;
 ALLEGRO_SAMPLE *jump;
 ALLEGRO_SAMPLE *ring;
+ALLEGRO_SAMPLE *musicgame;
 ALLEGRO_FONT *font;
 
 int i, j; // sei la pq isso ta aqui
@@ -104,6 +106,12 @@ bool iniciaJogo()
 	float vel_queda = 1.0;
 	Item novo;
 	Item anterior;
+
+	ALLEGRO_SAMPLE_INSTANCE* songInstance = al_create_sample_instance(musicgame);
+	al_set_sample_instance_playmode(songInstance, ALLEGRO_PLAYMODE_LOOP);
+
+	al_attach_sample_instance_to_mixer(songInstance, al_get_default_mixer());
+	al_play_sample_instance(songInstance);
 	while (vidas>0)
 	{
 		ALLEGRO_EVENT ev;
@@ -344,6 +352,7 @@ bool iniciaJogo()
 		al_clear_to_color(al_map_rgb(0, 0, 0));
 
 	}
+	al_destroy_sample_instance(songInstance);
 	return true;
 }
 
@@ -406,6 +415,8 @@ int main()
 		return -1;
 	}
 
+	al_init_acodec_addon();
+
 	/*Load de bitmaps*/
 	bg = al_load_bitmap("bitmaps/bg.jpg");
 	copo = al_load_bitmap("bitmaps/copo.png");
@@ -450,6 +461,11 @@ int main()
 		printf("Audio clip sample not loaded!\n");
 		return -1;
 	}
+	musicgame = al_load_sample("game.ogg");
+	if (!musicgame) {
+		printf("Audio clip sample not loaded!\n");
+		return -1;
+	}
 
 	/*Display*/
 	al_clear_to_color(al_map_rgb(0, 0, 0));
@@ -487,6 +503,7 @@ int main()
 	al_destroy_display(display);
 	al_destroy_sample(jump);
 	al_destroy_sample(ring);
+	al_destroy_sample(musicgame);
 
 
 
