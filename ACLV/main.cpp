@@ -17,32 +17,32 @@
 using std::vector;
 using std::string;
 
-#define DISPLAY_W 960
-#define DISPLAY_H 650
+#define DISPLAY_W 800
+#define DISPLAY_H 600
 #define FPS 60
 #define NUM_TIPOS 7
 #define PONTOS_PILHA_CERTA 100
-#define Y_ITEM_INICIAL 30
+#define Y_ITEM_INICIAL 50
 #define Y_ITEM_FINAL 480
 #define Y_DELTA_ITEM 54
-#define X_ITEM_0 300
+#define X_ITEM_0 140
 #define X_DELTA_ITEM 170
-#define X_PRIMEIRO_COPO 260
+#define X_PRIMEIRO_COPO 100
 #define X_DELTA_COPO 170
 #define Y_COPO 310
 #define Y_BOTAO_INICIAL 565
 #define Y_BOTAO_FINAL 595
-#define X_PRIMEIRO_BOTAO 292
-#define X_TAMANHO_BOTAO 70
 #define Y_COLISAO 260
 #define Y_VEL_QUEDA_COPO 1.1
-#define X_PRIMEIRO_ANIM 223
-#define Y_PRIMEIRO_ANIM 280
-#define X_PRIMEIRA_VIDA 50
-#define Y_PRIMEIRA_VIDA 490
-#define Y_DELTA_VIDA 32
+#define X_PRIMEIRO_ANIM 63
+#define Y_PRIMEIRO_ANIM 220
+#define X_PRIMEIRA_VIDA 420
+#define Y_PRIMEIRA_VIDA 10
+#define X_DELTA_VIDA 36
 #define Y_GABARITO_ULTIMO 520
-#define Y_PLACAR 490
+#define Y_PLACAR 0
+#define X_PLACAR 14
+#define X_GABARITO 80
 
 //variaveis globais
 ALLEGRO_DISPLAY *display = NULL;
@@ -100,7 +100,7 @@ bool iniciaJogo()
 	bool gab_stat[4] = { false };
 	int pontuou[3] = { -1 };
 	int vidas = 8;
-	float aceleracao = 0;
+	float aceleracao = 0.5;
 	float vel_queda = 1.0;
 	Item novo;
 	Item anterior;
@@ -138,30 +138,6 @@ bool iniciaJogo()
 		}
 
 
-		//mouse
-		al_get_mouse_state(&state);
-		if (state.buttons & 1) {
-			if (state.y > Y_BOTAO_INICIAL && state.y < Y_BOTAO_FINAL)
-			{
-				if (state.x > X_BOTAO[0][0] && state.x < X_BOTAO[0][1])
-				{
-					p_selecionada = 0;
-				}
-				else if (state.x > X_BOTAO[1][0] && state.x < X_BOTAO[1][1])
-				{
-					p_selecionada = 1;
-				}
-				else if (state.x > X_BOTAO[2][0] && state.x < X_BOTAO[2][1])
-				{
-					p_selecionada = 2;
-				}
-				else if (state.x > X_BOTAO[3][0] && state.x < X_BOTAO[3][1])
-				{
-					p_selecionada = 3;
-				}
-			}
-		}
-
 		//gabaritos
 		for (i = 0; i < 4; i++)
 		{
@@ -193,7 +169,15 @@ bool iniciaJogo()
 		if (gy < Y_COLISAO)
 		{
 			al_draw_bitmap(novo.get_bitmap(), novo.get_x(), gy, 0);
-			novo.set_pos(X_ITEM_0 + p_selecionada * X_DELTA_ITEM, gy + vel_queda);
+			float mais = vel_queda;
+			if (gy % 2 == 0 && gy % 3 == 0)
+				mais += aceleracao;
+			else if (aceleracao>3)
+			{
+				vel_queda++;
+				aceleracao = 0;
+			}
+			novo.set_pos(X_ITEM_0 + p_selecionada * X_DELTA_ITEM, gy + mais);
 		}
 		else if (gy >= Y_COLISAO)
 		{
@@ -254,7 +238,7 @@ bool iniciaJogo()
 			for (j = 3; j >= 0; j--)
 			{
 				int tipo = gabarito[i].get_item(j);
-				al_draw_bitmap(tb_bebida[tipo], 240 + 170 * i, Y_GABARITO_ULTIMO - 30 * j, 0);
+				al_draw_bitmap(tb_bebida[tipo], X_GABARITO + 170 * i, Y_GABARITO_ULTIMO - 30 * j, 0);
 			}
 
 			//Detecção se ta cheia + pontuação
@@ -278,8 +262,10 @@ bool iniciaJogo()
 					pontuou[2] = 3;
 					if(vidas<10)
 						vidas++;
-					if(vel_queda<2)
-						vel_queda += 0.5;
+					if (aceleracao < 3)
+						aceleracao += 0.5;
+					else
+						aceleracao += 0.25;
 					break;
 				case 3:
 					Pontos += PONTOS_PILHA_CERTA * 3 / 4;
@@ -288,8 +274,8 @@ bool iniciaJogo()
 					pontuou[1] = i;
 					pontuou[2] = 2;
 					vidas -= 1;
-					if (vel_queda<2)
-						vel_queda += 0.25;
+					if (aceleracao<5)
+						aceleracao += 0.25;
 					break;
 				case 2:
 					Pontos += PONTOS_PILHA_CERTA / 2;
@@ -298,8 +284,8 @@ bool iniciaJogo()
 					pontuou[1] = i;
 					pontuou[2] = 1;
 					vidas -= 2;
-					if (vel_queda<2)
-						vel_queda += 0.125;
+	
+						aceleracao += 0.125;
 					break;
 				case 1:
 					Pontos += PONTOS_PILHA_CERTA * 1 / 4;
@@ -308,8 +294,8 @@ bool iniciaJogo()
 					pontuou[1] = i;
 					pontuou[2] = 0;
 					vidas -= 3;
-					if (vel_queda<2)
-						vel_queda += 0.0625;
+
+						aceleracao += 0.0625;
 					break;
 				default:
 					vidas -= 4;
@@ -326,13 +312,6 @@ bool iniciaJogo()
 		al_draw_bitmap(copo, X_PRIMEIRO_COPO + X_DELTA_COPO, Y_COPO, 0);
 		al_draw_bitmap(copo, X_PRIMEIRO_COPO, Y_COPO, 0);
 
-		//Draw dos botoes
-		al_draw_bitmap(sel, X_BOTAO[0][0], Y_BOTAO_INICIAL, 0);
-		al_draw_bitmap(sel, X_BOTAO[1][0], Y_BOTAO_INICIAL, 0);
-		al_draw_bitmap(sel, X_BOTAO[2][0], Y_BOTAO_INICIAL, 0);
-		al_draw_bitmap(sel, X_BOTAO[3][0], Y_BOTAO_INICIAL, 0);
-		al_draw_bitmap(sel_down, X_BOTAO[p_selecionada][0], Y_BOTAO_INICIAL, 0);
-
 
 		//Animação pontos
 		if (pontuou[0] >= 0)
@@ -347,11 +326,12 @@ bool iniciaJogo()
 		//HUD
 		char num[5];
 		_itoa_s(Pontos, num, 10);
-		al_draw_text(font, al_map_rgb(255, 255, 255), 100, Y_PLACAR, ALLEGRO_ALIGN_CENTER, "Placar: ");
-		al_draw_text(font, al_map_rgb(255, 255, 255), 100, Y_PLACAR+ 30, ALLEGRO_ALIGN_CENTER, num);
-		for (i = vidas; i > 0; i--)
+		al_draw_text(font, al_map_rgb(255, 255, 255), X_PLACAR, Y_PLACAR, ALLEGRO_ALIGN_LEFT, "Placar: ");
+		al_draw_text(font, al_map_rgb(255, 255, 255), X_PLACAR+130, Y_PLACAR, ALLEGRO_ALIGN_LEFT, num);
+		al_draw_text(font, al_map_rgb(255, 255, 255), X_PRIMEIRA_VIDA-110, Y_PLACAR, ALLEGRO_ALIGN_LEFT, "Vidas:");
+		for (i = 0; i <vidas; i++)
 		{
-			al_draw_bitmap(vida, X_PRIMEIRA_VIDA, Y_PRIMEIRA_VIDA - i * Y_DELTA_VIDA, 0);
+			al_draw_bitmap(vida, X_PRIMEIRA_VIDA + i* X_DELTA_VIDA, Y_PRIMEIRA_VIDA, 0);
 		}
 
 		if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
@@ -370,12 +350,7 @@ bool iniciaJogo()
 int main()
 {
 	std::srand(unsigned(std::time(0)));
-	//geração da posicao dos botoes
-	for (i = 0; i < 4; i++)
-		for (j = 0; j < 2;j++)
-		{
-			X_BOTAO[i][j] = X_PRIMEIRO_BOTAO + i*X_DELTA_COPO + j*X_TAMANHO_BOTAO;
-		}
+
 
 	/*Inicializações*/
 	if (!al_init()) {
@@ -432,8 +407,8 @@ int main()
 	}
 
 	/*Load de bitmaps*/
-	bg = al_load_bitmap("bg.jpg");
-	copo = al_load_bitmap("copo.png");
+	bg = al_load_bitmap("bitmaps/bg.jpg");
+	copo = al_load_bitmap("bitmaps/copo.png");
 	bebida[0] = al_load_bitmap("frutas/limao.png");
 	bebida[1] = al_load_bitmap("frutas/tangerina.png");
 	bebida[2] = al_load_bitmap("frutas/cereja.png");
@@ -448,8 +423,6 @@ int main()
 	tb_bebida[4] = al_load_bitmap("frutas/tb-uva.png");
 	tb_bebida[5] = al_load_bitmap("frutas/tb-melancia.png");
 	tb_bebida[6] = al_load_bitmap("frutas/tb-morango.png");
-	sel = al_load_bitmap("sel.jpg");
-	sel_down = al_load_bitmap("sel_down.jpg");
 	vida = al_load_bitmap("bitmaps/vida.png");
 	if (!copo||!bg||!bebida[0] || !bebida[1] || !bebida[2] || !bebida[3] || !bebida[4] || !bebida[5] || !bebida[6]) {
 		fprintf(stderr, "failed to load image!\n");
