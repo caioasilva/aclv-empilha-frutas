@@ -18,29 +18,31 @@ using std::vector;
 using std::string;
 
 #define DISPLAY_W 960
-#define DISPLAY_H 540
+#define DISPLAY_H 650
 #define FPS 60
 #define NUM_TIPOS 7
 #define PONTOS_PILHA_CERTA 100
 #define Y_ITEM_INICIAL 30
-#define Y_ITEM_FINAL 390
+#define Y_ITEM_FINAL 480
 #define Y_DELTA_ITEM 54
 #define X_ITEM_0 300
 #define X_DELTA_ITEM 170
 #define X_PRIMEIRO_COPO 260
 #define X_DELTA_COPO 170
-#define Y_COPO 220
-#define Y_BOTAO_INICIAL 475
-#define Y_BOTAO_FINAL 505
+#define Y_COPO 310
+#define Y_BOTAO_INICIAL 565
+#define Y_BOTAO_FINAL 595
 #define X_PRIMEIRO_BOTAO 292
 #define X_TAMANHO_BOTAO 70
-#define Y_COLISAO 170
+#define Y_COLISAO 260
 #define Y_VEL_QUEDA_COPO 1.1
 #define X_PRIMEIRO_ANIM 223
-#define Y_PRIMEIRO_ANIM 190
+#define Y_PRIMEIRO_ANIM 280
 #define X_PRIMEIRA_VIDA 50
-#define Y_PRIMEIRA_VIDA 400
+#define Y_PRIMEIRA_VIDA 490
 #define Y_DELTA_VIDA 32
+#define Y_GABARITO_ULTIMO 520
+#define Y_PLACAR 490
 
 //variaveis globais
 ALLEGRO_DISPLAY *display = NULL;
@@ -61,16 +63,15 @@ ALLEGRO_SAMPLE *ring;
 ALLEGRO_FONT *font;
 
 int i, j; // sei la pq isso ta aqui
-int vel_queda = 1; // transformar em define
+
 int X_BOTAO[4][2];
 
 
-bool defineTiros(int& tiro, vector<int>& tipo_tiro, Pilha<Item> pilha[], Pilha<int> gabarito[])
+int defineTiro(Pilha<Item> pilha[], Pilha<int> gabarito[])
 {
-	if (tiro < 0)
-	{
-		tipo_tiro.erase(tipo_tiro.begin(), tipo_tiro.end());
-		printf("Criando fila de lançamento: \n");
+	vector<int> tipo_tiro;
+	tipo_tiro.reserve(4);
+		printf("Criando lançamentos: \n");
 		int i;
 		for (i = 0; i < 4; i++)
 		{
@@ -80,12 +81,8 @@ bool defineTiros(int& tiro, vector<int>& tipo_tiro, Pilha<Item> pilha[], Pilha<i
 			tipo_tiro.push_back(ritem);
 		}
 		std::random_shuffle(tipo_tiro.begin(), tipo_tiro.end());
-		tiro = 3;
-		return true;
-	}
-	else {
-		return false;
-	}
+		return tipo_tiro.at(0);
+
 }
 
 bool iniciaJogo()
@@ -103,6 +100,8 @@ bool iniciaJogo()
 	bool gab_stat[4] = { false };
 	int pontuou[3] = { -1 };
 	int vidas = 8;
+	float aceleracao = 0;
+	float vel_queda = 1.0;
 	Item novo;
 	Item anterior;
 	while (vidas>0)
@@ -128,14 +127,14 @@ bool iniciaJogo()
 			}
 			else if (ev.keyboard.keycode == ALLEGRO_KEY_DOWN)
 			{
-				vel_queda = 2;
+				vel_queda *= 2;
 			}
 		}
 		else if (ev.type == ALLEGRO_EVENT_KEY_UP)
 		{
 			KeyDown = false;
 			if (ev.keyboard.keycode == ALLEGRO_KEY_DOWN)
-				vel_queda = 1;
+				vel_queda /= 2;
 		}
 
 
@@ -179,9 +178,8 @@ bool iniciaJogo()
 		//criação do novo item
 		if (item_novo)
 		{
-			defineTiros(tiro, tipo_tiro, pilha, gabarito);
+			int tipo = defineTiro(pilha, gabarito);
 			item_novo = false;
-			int tipo = tipo_tiro.at(tiro--);
 			novo = Item(tipo, bebida[tipo], X_ITEM_0 + p_selecionada * X_DELTA_ITEM, Y_ITEM_INICIAL);
 			printf("Novo item gerado: tipo %d\n", novo.get_tipo());
 			al_play_sample(jump, 1.0, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
@@ -196,7 +194,6 @@ bool iniciaJogo()
 		{
 			al_draw_bitmap(novo.get_bitmap(), novo.get_x(), gy, 0);
 			novo.set_pos(X_ITEM_0 + p_selecionada * X_DELTA_ITEM, gy + vel_queda);
-
 		}
 		else if (gy >= Y_COLISAO)
 		{
@@ -257,7 +254,7 @@ bool iniciaJogo()
 			for (j = 3; j >= 0; j--)
 			{
 				int tipo = gabarito[i].get_item(j);
-				al_draw_bitmap(tb_bebida[tipo], 240 + 170 * i, 430 - 30 * j, 0);
+				al_draw_bitmap(tb_bebida[tipo], 240 + 170 * i, Y_GABARITO_ULTIMO - 30 * j, 0);
 			}
 
 			//Detecção se ta cheia + pontuação
@@ -279,7 +276,10 @@ bool iniciaJogo()
 					pontuou[0] = 0;
 					pontuou[1] = i;
 					pontuou[2] = 3;
-					vidas++;
+					if(vidas<10)
+						vidas++;
+					if(vel_queda<2)
+						vel_queda += 0.5;
 					break;
 				case 3:
 					Pontos += PONTOS_PILHA_CERTA * 3 / 4;
@@ -288,6 +288,8 @@ bool iniciaJogo()
 					pontuou[1] = i;
 					pontuou[2] = 2;
 					vidas -= 1;
+					if (vel_queda<2)
+						vel_queda += 0.25;
 					break;
 				case 2:
 					Pontos += PONTOS_PILHA_CERTA / 2;
@@ -296,6 +298,8 @@ bool iniciaJogo()
 					pontuou[1] = i;
 					pontuou[2] = 1;
 					vidas -= 2;
+					if (vel_queda<2)
+						vel_queda += 0.125;
 					break;
 				case 1:
 					Pontos += PONTOS_PILHA_CERTA * 1 / 4;
@@ -304,6 +308,8 @@ bool iniciaJogo()
 					pontuou[1] = i;
 					pontuou[2] = 0;
 					vidas -= 3;
+					if (vel_queda<2)
+						vel_queda += 0.0625;
 					break;
 				default:
 					vidas -= 4;
@@ -333,7 +339,7 @@ bool iniciaJogo()
 		{
 			al_draw_bitmap(anim[pontuou[2]][(int)(pontuou[0] / 2)], X_PRIMEIRO_ANIM + pontuou[1] * X_DELTA_COPO, Y_PRIMEIRO_ANIM, 0);
 			pontuou[0]++;
-			al_play_sample(ring, 1.0, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+			al_play_sample(ring, 0.7, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
 			if (pontuou[0] == 43)
 				pontuou[0] = -1;
 		}
@@ -341,8 +347,8 @@ bool iniciaJogo()
 		//HUD
 		char num[5];
 		_itoa_s(Pontos, num, 10);
-		al_draw_text(font, al_map_rgb(255, 255, 255), 100, 400, ALLEGRO_ALIGN_CENTER, "Placar: ");
-		al_draw_text(font, al_map_rgb(255, 255, 255), 100, 430, ALLEGRO_ALIGN_CENTER, num);
+		al_draw_text(font, al_map_rgb(255, 255, 255), 100, Y_PLACAR, ALLEGRO_ALIGN_CENTER, "Placar: ");
+		al_draw_text(font, al_map_rgb(255, 255, 255), 100, Y_PLACAR+ 30, ALLEGRO_ALIGN_CENTER, num);
 		for (i = vidas; i > 0; i--)
 		{
 			al_draw_bitmap(vida, X_PRIMEIRA_VIDA, Y_PRIMEIRA_VIDA - i * Y_DELTA_VIDA, 0);
