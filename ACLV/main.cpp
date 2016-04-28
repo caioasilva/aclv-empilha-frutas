@@ -348,6 +348,11 @@ bool iniciaJogo()
 					break;
 				default:
 					vidas -= 4;
+					if (vidas < 1)
+					{
+						fadeout(1);
+						acabou = true;
+					}
 					break;
 				}
 				gab_stat[i] = false;
@@ -367,17 +372,18 @@ bool iniciaJogo()
 		{
 			al_draw_bitmap(anim[pontuou[2]][(int)(pontuou[0] / 2)], X_PRIMEIRO_ANIM + pontuou[1] * X_DELTA_COPO, Y_PRIMEIRO_ANIM, 0);
 			pontuou[0]++;
-			al_play_sample(ring, 0.7, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+
 			if (pontuou[0] == 43)
 			{
 				pontuou[0] = -1;
-				if (vidas < 0)
+				if (vidas < 1)
 				{
 					fadeout(1);
 					acabou = true;
 				}
 					
 			}
+			al_play_sample(ring, 0.7, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
 				
 		}
 
