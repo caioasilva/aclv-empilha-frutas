@@ -90,6 +90,34 @@ int defineTiro(Pilha<Item> pilha[], Pilha<int> gabarito[])
 
 }
 
+void fadeout(int velocidade)
+{
+	ALLEGRO_BITMAP *buffer = NULL;
+	buffer = al_create_bitmap(DISPLAY_W, DISPLAY_H);
+	al_set_target_bitmap(buffer);
+	al_draw_bitmap(al_get_backbuffer(display), 0, 0, 0);
+	al_set_target_bitmap(al_get_backbuffer(display));
+
+	if (velocidade <= 0)
+	{
+		velocidade = 1;
+	}
+	else if (velocidade > 15)
+	{
+		velocidade = 15;
+	}
+
+	int alfa;
+	for (alfa = 0; alfa <= 255; alfa += velocidade)
+	{
+		al_clear_to_color(al_map_rgba(0, 0, 0, 0));
+		al_draw_tinted_bitmap(buffer, al_map_rgba(255 - alfa, 255 - alfa, 255 - alfa, alfa), 0, 0, 0);
+		al_flip_display();
+	}
+
+	al_destroy_bitmap(buffer);
+}
+
 bool iniciaJogo()
 {
 	Pilha<Item> pilha[4];
@@ -107,15 +135,18 @@ bool iniciaJogo()
 	int vidas = 6;
 	float aceleracao = 0.5;
 	int vel_queda = 1;
+	bool acel_vel = false;
 	Item novo;
 	Item anterior;
+	bool acabou = false;
+	int frames_vel = 0;
 
 	ALLEGRO_SAMPLE_INSTANCE* songInstance = al_create_sample_instance(musicgame);
 	al_set_sample_instance_playmode(songInstance, ALLEGRO_PLAYMODE_LOOP);
 
 	al_attach_sample_instance_to_mixer(songInstance, al_get_default_mixer());
 	al_play_sample_instance(songInstance);
-	while (vidas > 0)
+	while (!acabou)
 	{
 		ALLEGRO_EVENT ev;
 		al_wait_for_event(event_queue, &ev);
@@ -138,14 +169,14 @@ bool iniciaJogo()
 			}
 			else if (ev.keyboard.keycode == ALLEGRO_KEY_DOWN)
 			{
-				vel_queda *= 2;
+				acel_vel = true;
 			}
 		}
 		else if (ev.type == ALLEGRO_EVENT_KEY_UP)
 		{
 			KeyDown = false;
 			if (ev.keyboard.keycode == ALLEGRO_KEY_DOWN)
-				vel_queda /= 2;
+				acel_vel = false;
 		}
 
 
@@ -163,7 +194,7 @@ bool iniciaJogo()
 		}
 
 		//criação do novo item
-		if (item_novo)
+		if (item_novo&&!acabou)
 		{
 			int tipo = defineTiro(pilha, gabarito);
 			item_novo = false;
@@ -183,15 +214,24 @@ bool iniciaJogo()
 			al_draw_bitmap(novo.get_bitmap(), novo.get_x(), gy, 0);
 			int mais = vel_queda;
 			int numero = 6-aceleracao;
+			frames_vel++;
+
 			if (numero == 0)
 			{
 				vel_queda++;
 				aceleracao = 0;
 				mais = vel_queda;
+				frames_vel = 0;
 			}
-			else if ((gy/vel_queda) % numero == 0)
+
+			else if (frames_vel >= numero)
+			{
+				frames_vel=0;
 				mais++;
-			//printf("%d", mais);
+			}
+
+			if (acel_vel)
+				mais *= 2;
 			novo.set_pos(X_ITEM_0 + p_selecionada * X_DELTA_ITEM, gy + mais);
 		}
 		else if (gy >= Y_COLISAO)
@@ -329,7 +369,16 @@ bool iniciaJogo()
 			pontuou[0]++;
 			al_play_sample(ring, 0.7, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
 			if (pontuou[0] == 43)
+			{
 				pontuou[0] = -1;
+				if (vidas < 0)
+				{
+					fadeout(1);
+					acabou = true;
+				}
+					
+			}
+				
 		}
 
 		//HUD
