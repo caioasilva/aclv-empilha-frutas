@@ -12,7 +12,7 @@
 #include "Pilha.h"
 #include <vector>
 #include <algorithm>  
-#include <ctime>        // std::time
+#include <ctime>
 #include <string>
 
 using std::vector;
@@ -40,7 +40,7 @@ using std::string;
 #define X_PRIMEIRA_VIDA 420
 #define Y_PRIMEIRA_VIDA 10
 #define X_DELTA_VIDA 36
-#define Y_GABARITO_ULTIMO 520
+#define Y_GABARITO_PRIMEIRO 430
 #define Y_PLACAR 0
 #define X_PLACAR 14
 #define X_GABARITO 80
@@ -48,8 +48,12 @@ using std::string;
 //variaveis globais
 ALLEGRO_DISPLAY *display = NULL;
 ALLEGRO_BITMAP  *bg = NULL;
+ALLEGRO_BITMAP  *loading = NULL;
 ALLEGRO_BITMAP  *gameover = NULL;
+ALLEGRO_BITMAP  *menu = NULL;
+ALLEGRO_BITMAP  *ajuda = NULL;
 ALLEGRO_BITMAP  *copo = NULL;
+ALLEGRO_BITMAP  *icon = NULL;
 ALLEGRO_BITMAP  *sel = NULL;
 ALLEGRO_BITMAP  *sel_down = NULL;
 ALLEGRO_BITMAP  *vida = NULL;
@@ -65,11 +69,7 @@ ALLEGRO_SAMPLE *ring;
 ALLEGRO_SAMPLE *musicgame;
 ALLEGRO_FONT *font;
 ALLEGRO_FONT *pontos_gameover;
-
-
-int i, j; // sei la pq isso ta aqui
-
-int X_BOTAO[4][2];
+int i, j;
 
 
 int defineTiro(Pilha<Item> pilha[], Pilha<int> gabarito[])
@@ -93,6 +93,7 @@ int defineTiro(Pilha<Item> pilha[], Pilha<int> gabarito[])
 void fadeout(int velocidade)
 {
 	ALLEGRO_BITMAP *buffer = NULL;
+	ALLEGRO_EVENT ev;
 	buffer = al_create_bitmap(DISPLAY_W, DISPLAY_H);
 	al_set_target_bitmap(buffer);
 	al_draw_bitmap(al_get_backbuffer(display), 0, 0, 0);
@@ -112,10 +113,95 @@ void fadeout(int velocidade)
 	{
 		al_clear_to_color(al_map_rgba(0, 0, 0, 0));
 		al_draw_tinted_bitmap(buffer, al_map_rgba(255 - alfa, 255 - alfa, 255 - alfa, alfa), 0, 0, 0);
+		al_wait_for_event(event_queue, &ev);
 		al_flip_display();
 	}
 
 	al_destroy_bitmap(buffer);
+}
+
+void fadein(ALLEGRO_BITMAP *imagem, int velocidade)
+{
+	ALLEGRO_EVENT ev;
+	
+	if (velocidade < 0)
+	{
+		velocidade = 1;
+	}
+	else if (velocidade > 15)
+	{
+		velocidade = 15;
+	}
+
+	int alfa;
+	for (alfa = 0; alfa <= 255; alfa += velocidade)
+	{
+		al_clear_to_color(al_map_rgb(0, 0, 0));
+		al_draw_tinted_bitmap(imagem, al_map_rgba(alfa, alfa, alfa, alfa), 0, 0, 0);
+		al_wait_for_event(event_queue, &ev);
+		al_flip_display();
+	}
+}
+
+int iniciaMenu()
+{
+	int botao = -1;
+
+	while (botao==-1) {
+		ALLEGRO_EVENT ev;
+		al_wait_for_event(event_queue, &ev);
+		al_draw_bitmap(menu, 0, 0, 0);
+
+		al_get_mouse_state(&state);
+		if (state.buttons & 1)
+			if(state.y > 499 && state.y < 550)
+				if (state.x > 127 && state.x < 294)
+				{
+					botao = 1;
+					fadeout(10);
+				}else if (state.x > 315 && state.x < 483)
+				{
+					botao = 2;
+					fadeout(10);
+				}
+				else if(state.x > 505 && state.x < 672)
+				{
+					botao = 0;
+				}
+
+
+		if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
+			return 0;
+		al_flip_display();
+		al_clear_to_color(al_map_rgb(0, 0, 0));
+	}
+	
+	return botao;
+
+}
+
+bool iniciaAjuda()
+{
+	bool botao = false;
+
+	while (!botao) {
+		ALLEGRO_EVENT ev;
+		al_wait_for_event(event_queue, &ev);
+		al_draw_bitmap(ajuda, 0, 0, 0);
+
+		al_get_mouse_state(&state);
+		if (state.buttons & 1)
+			if ((state.y > 483 && state.y < 550)&& (state.x > 28 && state.x < 201))
+				{
+					botao = true;
+					fadeout(10);
+				}
+				if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
+					return false;
+				al_flip_display();
+				al_clear_to_color(al_map_rgb(0, 0, 0));
+	}
+	return botao;
 }
 
 bool iniciaJogo()
@@ -140,6 +226,8 @@ bool iniciaJogo()
 	Item anterior;
 	bool acabou = false;
 	int frames_vel = 0;
+	bool fade = true;
+	bool fout = false;
 
 	ALLEGRO_SAMPLE_INSTANCE* songInstance = al_create_sample_instance(musicgame);
 	al_set_sample_instance_playmode(songInstance, ALLEGRO_PLAYMODE_LOOP);
@@ -194,7 +282,7 @@ bool iniciaJogo()
 		}
 
 		//criação do novo item
-		if (item_novo&&!acabou)
+		if (item_novo&&vidas>0)
 		{
 			int tipo = defineTiro(pilha, gabarito);
 			item_novo = false;
@@ -239,18 +327,14 @@ bool iniciaJogo()
 			l_pilha = p_selecionada;
 			anterior = novo;
 			item_novo = true;
-			//printf("Pilha escolhida: %d\n", l_pilha);
 			if (!(pilha[l_pilha].cheia()))
 			{
 				int yfinal = Y_ITEM_FINAL - pilha[l_pilha].get_quant_itens() * Y_DELTA_ITEM;
 				novo.set_pos(X_ITEM_0 + p_selecionada * X_DELTA_ITEM, yfinal);
 				pilha[l_pilha].coloca(novo);
-				//printf("Item adicionado a Pilha %d\n", l_pilha);
-				//anterior.set_pos(X_ITEM_0 + p_selecionada * X_DELTA_ITEM, gy );
 			}
 			else
 			{
-				//printf("Pilha %d cheia\n", l_pilha);
 				l_pilha = -1;
 			}
 		}
@@ -278,22 +362,37 @@ bool iniciaJogo()
 		for (i = 0; i < 4; i++)
 		{
 			//Draw
-			int t = 0;
+			int t;
 			int quant = pilha[i].get_quant_itens();
-			if (l_pilha == i)
-				quant--;
-			while (t < quant)
+			Pilha<Item> aux(4);
+			for (t = 0; t < quant;t++)
 			{
-				Item temp = pilha[i].get_item(t);
-				al_draw_bitmap(temp.get_bitmap(), temp.get_x(), temp.get_y(), 0);
-				t++;
+				Item temp = pilha[i].retira();
+				aux.coloca(temp);
+				if (!(l_pilha == i&&t==0))
+				{
+					al_draw_bitmap(temp.get_bitmap(), temp.get_x(), temp.get_y(), 0);
+				}
+			}
+			for (t = 0; t < quant; t++)
+			{
+				Item temp = aux.retira();
+				pilha[i].coloca(temp);
 			}
 
+			
+			Pilha<int> auxGab(4);
 			//Draw dos gabaritos
-			for (j = 3; j >= 0; j--)
+			for (j = 0; j < 4; j++)
 			{
-				int tipo = gabarito[i].get_item(j);
-				al_draw_bitmap(tb_bebida[tipo], X_GABARITO + 170 * i, Y_GABARITO_ULTIMO - 30 * j, 0);
+				int tipo = gabarito[i].retira();
+				al_draw_bitmap(tb_bebida[tipo], X_GABARITO + 170 * i, Y_GABARITO_PRIMEIRO + 30 * j, 0);
+				auxGab.coloca(tipo);
+			}
+			for (j = 0; j < 4; j++)
+			{
+				int tipo = auxGab.retira();
+				gabarito[i].coloca(tipo);
 			}
 
 			//Detecção se ta cheia + pontuação
@@ -350,8 +449,7 @@ bool iniciaJogo()
 					vidas -= 4;
 					if (vidas < 1)
 					{
-						fadeout(1);
-						acabou = true;
+						fout = true;
 					}
 					break;
 				}
@@ -366,27 +464,6 @@ bool iniciaJogo()
 		al_draw_bitmap(copo, X_PRIMEIRO_COPO + X_DELTA_COPO, Y_COPO, 0);
 		al_draw_bitmap(copo, X_PRIMEIRO_COPO, Y_COPO, 0);
 
-
-		//Animação pontos
-		if (pontuou[0] >= 0)
-		{
-			al_draw_bitmap(anim[pontuou[2]][(int)(pontuou[0] / 2)], X_PRIMEIRO_ANIM + pontuou[1] * X_DELTA_COPO, Y_PRIMEIRO_ANIM, 0);
-			pontuou[0]++;
-
-			if (pontuou[0] == 43)
-			{
-				pontuou[0] = -1;
-				if (vidas < 1)
-				{
-					fadeout(1);
-					acabou = true;
-				}
-					
-			}
-			al_play_sample(ring, 0.7, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
-				
-		}
-
 		//HUD
 		char num[5];
 		_itoa_s(Pontos, num, 10);
@@ -397,6 +474,39 @@ bool iniciaJogo()
 		{
 			al_draw_bitmap(vida, X_PRIMEIRA_VIDA + i* X_DELTA_VIDA, Y_PRIMEIRA_VIDA, 0);
 		}
+
+		//Animação pontos
+		if (pontuou[0] >= 0)
+		{
+			al_draw_bitmap(anim[pontuou[2]][(int)(pontuou[0] / 2)], X_PRIMEIRO_ANIM + pontuou[1] * X_DELTA_COPO, Y_PRIMEIRO_ANIM, 0);
+			pontuou[0]++;
+			if(pontuou[0]==1)
+				al_play_sample(ring, 0.7, 0.0, 1.0, ALLEGRO_PLAYMODE_ONCE, NULL);
+			else if (pontuou[0] == 43)
+			{
+				pontuou[0] = -1;
+				if (vidas < 1)
+				{
+					fout = true;
+				}
+			}
+		}
+
+		if (fade)
+		{
+			ALLEGRO_BITMAP *buffer = NULL;
+			buffer = al_create_bitmap(DISPLAY_W, DISPLAY_H);
+			al_set_target_bitmap(buffer);
+			al_draw_bitmap(al_get_backbuffer(display), 0, 0, 0);
+			al_set_target_bitmap(al_get_backbuffer(display));
+			fadein(buffer, 10);
+			fade = false;
+		}else if(fout)
+		{
+			fadeout(10);
+			acabou = true;
+		}
+
 
 		if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
 		{
@@ -411,7 +521,7 @@ bool iniciaJogo()
 	al_destroy_sample_instance(songInstance);
 
 	bool botao = false;
-	
+	fadein(gameover, 15);
 	while(!botao){
 		ALLEGRO_EVENT ev;
 		al_wait_for_event(event_queue, &ev);
@@ -422,7 +532,10 @@ bool iniciaJogo()
 		al_get_mouse_state(&state);
 		if (state.buttons & 1)
 			if ((state.y > 395 && state.y < 455) && (state.x > 537 && state.x < 684))
+			{
 				botao = true;
+				fadeout(10);
+			}
 
 		if (ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
 			return false;
@@ -435,6 +548,7 @@ bool iniciaJogo()
 int main()
 {
 	std::srand(unsigned(std::time(0)));
+	bool exit = false;
 
 
 	/*Inicializações*/
@@ -443,20 +557,28 @@ int main()
 		return -1;
 	}
 
+
 	if (!al_init_image_addon()) {
 		fprintf(stderr, "failed to init image addon!\n");
 		return -1;
 	}
 
-	if (!al_install_mouse()) {
-		fprintf(stderr, "Error installing mouse.\n");
-		return -1;
-	}
-	
-
 	display = al_create_display(DISPLAY_W, DISPLAY_H);
 	if (!display) {
 		fprintf(stderr, "failed to create display!\n");
+		return -1;
+	}
+	al_set_window_title(display, "Empilha Frutas do Moe");
+
+
+	loading = al_load_bitmap("data/bitmaps/loading.jpg");
+	icon = al_load_bitmap("data/bitmaps/icon.png");
+	al_draw_bitmap(loading, 0, 0, 0);
+	al_set_display_icon(display, icon);
+
+
+	if (!al_install_mouse()) {
+		fprintf(stderr, "Error installing mouse.\n");
 		return -1;
 	}
 
@@ -464,7 +586,7 @@ int main()
 
 	al_init_primitives_addon();
 
-	al_init_ttf_addon();// initialize the ttf (True Type Font) addon
+	al_init_ttf_addon();
 
 
 	if (!al_install_audio()) {
@@ -481,9 +603,9 @@ int main()
 		fprintf(stderr, "failed to reserve samples!\n");
 		return -1;
 	}
-	font = al_load_ttf_font("KOMIKAX_.ttf", 28, 0);
-	pontos_gameover = al_load_ttf_font("KOMIKAX_.ttf", 58, 0);
-	if (!font) {
+	font = al_load_ttf_font("data/KOMIKAX_.ttf", 28, 0);
+	pontos_gameover = al_load_ttf_font("data/KOMIKAX_.ttf", 58, 0);
+	if (!font||!pontos_gameover) {
 		fprintf(stderr, "Could not load 'KOMIKAX_.ttf'.\n");
 		return -1;
 	}
@@ -494,25 +616,28 @@ int main()
 
 	al_init_acodec_addon();
 
+
 	/*Load de bitmaps*/
-	bg = al_load_bitmap("bitmaps/bg.jpg");
-	gameover = al_load_bitmap("bitmaps/gameover.jpg");
-	copo = al_load_bitmap("bitmaps/copo.png");
-	bebida[0] = al_load_bitmap("frutas/limao.png");
-	bebida[1] = al_load_bitmap("frutas/tangerina.png");
-	bebida[2] = al_load_bitmap("frutas/cereja.png");
-	bebida[3] = al_load_bitmap("frutas/maca.png");
-	bebida[4] = al_load_bitmap("frutas/uva.png");
-	bebida[5] = al_load_bitmap("frutas/melancia.png");
-	bebida[6] = al_load_bitmap("frutas/morango.png");
-	tb_bebida[0] = al_load_bitmap("frutas/tb-limao.png");
-	tb_bebida[1] = al_load_bitmap("frutas/tb-tangerina.png");
-	tb_bebida[2] = al_load_bitmap("frutas/tb-cereja.png");
-	tb_bebida[3] = al_load_bitmap("frutas/tb-maca.png");
-	tb_bebida[4] = al_load_bitmap("frutas/tb-uva.png");
-	tb_bebida[5] = al_load_bitmap("frutas/tb-melancia.png");
-	tb_bebida[6] = al_load_bitmap("frutas/tb-morango.png");
-	vida = al_load_bitmap("bitmaps/vida.png");
+	bg = al_load_bitmap("data/bitmaps/bg.jpg");
+	gameover = al_load_bitmap("data/bitmaps/gameover.jpg");
+	menu = al_load_bitmap("data/bitmaps/menu.jpg");
+	ajuda = al_load_bitmap("data/bitmaps/ajuda.jpg");
+	copo = al_load_bitmap("data/bitmaps/copo.png");
+	bebida[0] = al_load_bitmap("data/bitmaps/frutas/limao.png");
+	bebida[1] = al_load_bitmap("data/bitmaps/frutas/tangerina.png");
+	bebida[2] = al_load_bitmap("data/bitmaps/frutas/cereja.png");
+	bebida[3] = al_load_bitmap("data/bitmaps/frutas/maca.png");
+	bebida[4] = al_load_bitmap("data/bitmaps/frutas/uva.png");
+	bebida[5] = al_load_bitmap("data/bitmaps/frutas/melancia.png");
+	bebida[6] = al_load_bitmap("data/bitmaps/frutas/morango.png");
+	tb_bebida[0] = al_load_bitmap("data/bitmaps/frutas/tb-limao.png");
+	tb_bebida[1] = al_load_bitmap("data/bitmaps/frutas/tb-tangerina.png");
+	tb_bebida[2] = al_load_bitmap("data/bitmaps/frutas/tb-cereja.png");
+	tb_bebida[3] = al_load_bitmap("data/bitmaps/frutas/tb-maca.png");
+	tb_bebida[4] = al_load_bitmap("data/bitmaps/frutas/tb-uva.png");
+	tb_bebida[5] = al_load_bitmap("data/bitmaps/frutas/tb-melancia.png");
+	tb_bebida[6] = al_load_bitmap("data/bitmaps/frutas/tb-morango.png");
+	vida = al_load_bitmap("data/bitmaps/vida.png");
 	if (!copo||!bg||!bebida[0] || !bebida[1] || !bebida[2] || !bebida[3] || !bebida[4] || !bebida[5] || !bebida[6]) {
 		fprintf(stderr, "failed to load image!\n");
 		al_destroy_display(display);
@@ -523,29 +648,30 @@ int main()
 	{
 		for (i = 0; i < 22; i++)
 		{
-			string nome = "anims/" + std::to_string(j*25) +"/" + std::to_string(i) + ".png";
+			string nome = "data/anims/" + std::to_string(j*25) +"/" + std::to_string(i) + ".png";
 			anim[j-1][i] = al_load_bitmap(nome.c_str());
 		}
 	}
 	
 
-	jump = al_load_sample("jump.wav");
+	jump = al_load_sample("data/audio/jump.wav");
 	if (!jump) {
 		printf("Audio clip sample not loaded!\n");
 		return -1;
 	}
-	ring = al_load_sample("ring.wav");
+	ring = al_load_sample("data/audio/ring.wav");
 	if (!ring) {
 		printf("Audio clip sample not loaded!\n");
 		return -1;
 	}
-	musicgame = al_load_sample("game.ogg");
+	musicgame = al_load_sample("data/audio/game.ogg");
 	if (!musicgame) {
 		printf("Audio clip sample not loaded!\n");
 		return -1;
 	}
 
 	/*Display*/
+	al_flip_display();
 	al_clear_to_color(al_map_rgb(0, 0, 0));
 	timer = al_create_timer(1.0 / FPS);
 	event_queue = al_create_event_queue();
@@ -556,10 +682,10 @@ int main()
 	al_register_event_source(event_queue, al_get_display_event_source(display));
 
 
-	//implementar menu aqui chamando o jogo
-	/*
+
 	while(!exit)
 	{
+		fadein(menu, 10);
 		switch(iniciaMenu())
 		{
 		case 0:
@@ -569,12 +695,14 @@ int main()
 			if(!iniciaJogo())
 				exit = true;
 		break;
+		case 2:
+			fadein(ajuda, 10);
+			if (!iniciaAjuda())
+				exit = true;
+		break;
 		}
 	}
-	*/
 
-	//chamada do jogo provisoria
-	iniciaJogo();
 
 	al_destroy_event_queue(event_queue);
 	al_destroy_timer(timer);
