@@ -22,7 +22,9 @@ using std::string;
 #define DISPLAY_H 600
 #define FPS 60
 #define NUM_TIPOS 7
+#define VIDAS_INICIAL 4
 #define PONTOS_PILHA_CERTA 100
+#define ACELERACAO_INICIAL 0.5
 #define Y_ITEM_INICIAL 50
 #define Y_ITEM_FINAL 480
 #define Y_DELTA_ITEM 54
@@ -38,11 +40,11 @@ using std::string;
 #define X_PRIMEIRO_ANIM 63
 #define Y_PRIMEIRO_ANIM 220
 #define X_PRIMEIRA_VIDA 420
-#define Y_PRIMEIRA_VIDA 10
+#define Y_PRIMEIRA_VIDA 9
 #define X_DELTA_VIDA 36
 #define Y_GABARITO_PRIMEIRO 430
-#define Y_PLACAR 0
-#define X_PLACAR 14
+#define Y_PLACAR -2
+#define X_PLACAR 55
 #define X_GABARITO 80
 
 //variaveis globais
@@ -54,8 +56,6 @@ ALLEGRO_BITMAP  *menu = NULL;
 ALLEGRO_BITMAP  *ajuda = NULL;
 ALLEGRO_BITMAP  *copo = NULL;
 ALLEGRO_BITMAP  *icon = NULL;
-ALLEGRO_BITMAP  *sel = NULL;
-ALLEGRO_BITMAP  *sel_down = NULL;
 ALLEGRO_BITMAP  *vida = NULL;
 ALLEGRO_BITMAP  *bebida[7] = { NULL };
 ALLEGRO_BITMAP  *tb_bebida[7] = { NULL };
@@ -71,25 +71,7 @@ ALLEGRO_FONT *font;
 ALLEGRO_FONT *pontos_gameover;
 int i, j;
 
-
-int defineTiro(Pilha<Item> pilha[], Pilha<int> gabarito[])
-{
-	vector<int> tipo_tiro;
-	tipo_tiro.reserve(4);
-		//printf("Criando lançamentos: \n");
-		int i;
-		for (i = 0; i < 4; i++)
-		{
-			int quant = pilha[i].get_quant_itens();
-			int ritem = gabarito[i].get_item(quant);
-			//printf("Pilha: %d Andar da pilha: %d Item: %d\n", i, quant, ritem);
-			tipo_tiro.push_back(ritem);
-		}
-		std::random_shuffle(tipo_tiro.begin(), tipo_tiro.end());
-		return tipo_tiro.at(0);
-
-}
-
+//Função que realiza um efeito de fade out nas telas
 void fadeout(int velocidade)
 {
 	ALLEGRO_BITMAP *buffer = NULL;
@@ -120,6 +102,7 @@ void fadeout(int velocidade)
 	al_destroy_bitmap(buffer);
 }
 
+//Função que realiza um efeito de fade in nas telas
 void fadein(ALLEGRO_BITMAP *imagem, int velocidade)
 {
 	ALLEGRO_EVENT ev;
@@ -143,6 +126,26 @@ void fadein(ALLEGRO_BITMAP *imagem, int velocidade)
 	}
 }
 
+//Função geradora do tipo da proxima fruta a ser lançada
+int defineTiro(Pilha<Item> pilha[], Pilha<int> gabarito[])
+{
+	vector<int> tipo_tiro;
+	tipo_tiro.reserve(4);
+	//printf("Criando lançamentos: \n");
+	int i;
+	for (i = 0; i < 4; i++)
+	{
+		int quant = pilha[i].get_quant_itens();
+		int ritem = gabarito[i].get_item(quant);
+		//printf("Pilha: %d Andar da pilha: %d Item: %d\n", i, quant, ritem);
+		tipo_tiro.push_back(ritem);
+	}
+	std::random_shuffle(tipo_tiro.begin(), tipo_tiro.end());
+	return tipo_tiro.at(0);
+
+}
+
+//Tela de menu
 int iniciaMenu()
 {
 	int botao = -1;
@@ -180,6 +183,7 @@ int iniciaMenu()
 
 }
 
+//Tela de ajuda
 bool iniciaAjuda()
 {
 	bool botao = false;
@@ -204,12 +208,12 @@ bool iniciaAjuda()
 	return botao;
 }
 
+//Jogo
 bool iniciaJogo()
 {
 	Pilha<Item> pilha[4];
 	int Pontos = 0;
 	bool item_novo = true;
-	int tiro = -1;
 	vector<int> tipo_tiro;
 	tipo_tiro.reserve(4);
 	Pilha<int> gabarito[4];
@@ -218,8 +222,8 @@ bool iniciaJogo()
 	bool KeyDown = false;
 	bool gab_stat[4] = { false };
 	int pontuou[3] = { -1 };
-	int vidas = 6;
-	float aceleracao = 0.5;
+	int vidas = VIDAS_INICIAL;
+	float aceleracao = ACELERACAO_INICIAL;
 	int vel_queda = 1;
 	bool acel_vel = false;
 	Item novo;
@@ -267,7 +271,6 @@ bool iniciaJogo()
 				acel_vel = false;
 		}
 
-
 		//gabaritos
 		for (i = 0; i < 4; i++)
 		{
@@ -292,10 +295,6 @@ bool iniciaJogo()
 			aceleracao += 0.1;
 		}
 
-
-		//Draw do item e COLISAO
-		if (tiro >= 0)
-			al_draw_bitmap(tb_bebida[tipo_tiro.at(tiro)], X_ITEM_0 - 30 + p_selecionada * X_DELTA_ITEM, Y_ITEM_INICIAL, 0);
 		int gy = novo.get_y();
 		if (gy < Y_COLISAO)
 		{
@@ -416,7 +415,7 @@ bool iniciaJogo()
 					pontuou[2] = 3;
 					if (vidas < 10)
 						vidas++;
-						aceleracao += 0.1;
+					aceleracao += 0.1;
 					break;
 				case 3:
 					Pontos += PONTOS_PILHA_CERTA * 3 / 4;
@@ -492,6 +491,18 @@ bool iniciaJogo()
 			}
 		}
 
+		//botao voltar
+		al_get_mouse_state(&state);
+		if (state.buttons & 1)
+			if ((state.y > 9 && state.y < 38) && (state.x > 4 && state.x < 36))
+			{
+				fadeout(10);
+				al_destroy_sample_instance(songInstance);
+				al_flip_display();
+				al_clear_to_color(al_map_rgb(0, 0, 0));
+				return true;
+			}
+
 		if (fade)
 		{
 			ALLEGRO_BITMAP *buffer = NULL;
@@ -520,6 +531,7 @@ bool iniciaJogo()
 	}
 	al_destroy_sample_instance(songInstance);
 
+	//Tela de Fim de jogo
 	bool botao = false;
 	fadein(gameover, 15);
 	while(!botao){
